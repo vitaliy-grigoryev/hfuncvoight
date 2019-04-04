@@ -185,69 +185,92 @@ real(k_p), dimension(0:knots_y) :: y, fy
 integer :: knot_brdr, i
 
 	int1 = 0.0_k_p
+	int2 = 0.0_k_p
 	fy = 0.0_k_p
-	if (xin .le. x_middle) then
-		
-		forall (i=0:knots_y)
-			y(i) = (xin)*dble(i)/dble(knots_y)
-		end forall
-		do i=1, knots_y
-			call knots_and_weights(knots_l, y(i-1), y(i), xx(:,i), w(:,i))
-		end do
-		forall (i = 1:knots_y)
-			fy(i) = sum(w(1:knots_l,i)*calc_u(a,xx(1:knots_l,i)))  
-		end forall
-		int1 = sum(fy)
-
-	else !(xin .gt. x_middle)
 	
-		knot_brdr = knot_x_last
-		do while ((x(knot_brdr) .lt. xin) .and. (knot_brdr .lt. knots))
-			knot_brdr = knot_brdr + 1
-		end do
-		
-		if (xin .ge. 100.0_k_p*x_middle) then !x(knot_x_last)
+	knot_brdr = 0!knot_x_last
+	do while ((x(knot_brdr) .lt. xin) .and. (knot_brdr .lt. knots))
+		knot_brdr = knot_brdr + 1
+	end do
+	int1 = table_int(knot_brdr, knots, x(0:knots), uax(0:knots))
+	
+	if (x(knot_brdr) .gt. xin) then
+		if (x(knot_brdr) .le. x_middle) then
+			call knots_and_weights(knots_l, x(knot_brdr), xin, xx(:,1), w(:,1))
+			int2 = sum(w(1:knots_l,1)*calc_u(a,xx(1:knots_l,1)))  
+		else
+			call knots_and_weights(knots_l, log(x(knot_brdr)/x_middle), log(xin/x_middle), xx(:,1), w(:,1))
+			int2 = sum(w(1:knots_l,1)*calc_u(a, xx(1:knots_l,1))*x_middle*exp(xx(1:knots_l,1)))  
+		end if
+	end if
+	int1 = int1 - int2
+	
+	
+	
+! 	if (xin .le. x_middle) then
+! 		
+! 		forall (i=0:knots_y)
+! 			y(i) = (xin)*dble(i)/dble(knots_y)
+! 		end forall
+! 		do i=1, knots_y
+! 			call knots_and_weights(knots_l, y(i-1), y(i), xx(:,i), w(:,i))
+! 		end do
+! 		forall (i = 1:knots_y)
+! 			fy(i) = sum(w(1:knots_l,i)*calc_u(a,xx(1:knots_l,i)))  
+! 		end forall
+! 		int1 = sum(fy)
+! 
+! 	else !(xin .gt. x_middle)
+! 	
+! 		knot_brdr = knot_x_last
+! 		do while ((x(knot_brdr) .lt. xin) .and. (knot_brdr .lt. knots))
+! 			knot_brdr = knot_brdr + 1
+! 		end do
+! 		
+! 		if (xin .ge. 1.0_k_p*x_middle) then !x(knot_x_last)
+! ! 			fy = 0.0_k_p
+! ! 			forall (i=0:knots_y)
+! ! 				y(i) = (log(x(knots)/x_middle) - log(xin/x_middle))*dble(i)/dble(knots_y)
+! ! 			end forall
+! ! 			do i=1, knots_y
+! ! 				call knots_and_weights(knots_l, y(i-1), y(i), tt(:,i), w(:,i))
+! ! 			end do
+! ! 			forall (i = 1:knots_y)
+! ! 				fy(i) = x_middle*sum(w(1:knots_l,i)*exp(tt(1:knots_l,i))*calc_u(a,x_middle*exp(tt(1:knots_l,i))))  
+! ! 			end forall
+! ! 			int2 = sum(fy) ! посчитано то, что и нужно
+! 			
+! 			!int1 = simpson_int_knots_fx(knot_brdr, knot_x_last, x(0:knot_brdr), uax(0:knot_brdr))
+! 			int1 = table_int(knot_brdr, knots, x(0:knots), uax(0:knots))
+! 		else
+! 			forall (i=0:knots_y)
+! 				y(i) = x_middle*dble(i)/dble(knots_y)
+! 			end forall
+! 			do i=1, knots_y
+! 				call knots_and_weights(knots_l, y(i-1), y(i), xx(:,i), w(:,i))
+! 			end do
+! 			forall (i = 1:knots_y)
+! 				fy(i) = sum(w(1:knots_l,i)*calc_u(a,xx(1:knots_l,i)))  
+! 			end forall
+! 			int1 = sum(fy)
+! 			
 ! 			fy = 0.0_k_p
 ! 			forall (i=0:knots_y)
-! 				y(i) = (log(x(knots)/x_middle) - log(xin/x_middle))*dble(i)/dble(knots_y)
+! 				y(i) = log(xin/x_middle)*dble(i)/dble(knots_y)
 ! 			end forall
 ! 			do i=1, knots_y
 ! 				call knots_and_weights(knots_l, y(i-1), y(i), tt(:,i), w(:,i))
 ! 			end do
 ! 			forall (i = 1:knots_y)
-! 				fy(i) = x_middle*sum(w(1:knots_l,i)*exp(tt(1:knots_l,i))*calc_u(a,x_middle*exp(tt(1:knots_l,i))))  
+! 				fy(i) = sum(w(1:knots_l,i)*x_middle*exp(tt(1:knots_l,i))*calc_u(a,x_middle*exp(tt(1:knots_l,i))))  
 ! 			end forall
-! 			int2 = sum(fy) ! посчитано то, что и нужно
-			int1 = simpson_int_knots_fx(knot_brdr, knot_x_last, x(0:knot_brdr), x_middle, uax(0:knot_brdr))
-		else
-			forall (i=0:knots_y)
-				y(i) = x_middle*dble(i)/dble(knots_y)
-			end forall
-			do i=1, knots_y
-				call knots_and_weights(knots_l, y(i-1), y(i), xx(:,i), w(:,i))
-			end do
-			forall (i = 1:knots_y)
-				fy(i) = sum(w(1:knots_l,i)*calc_u(a,xx(1:knots_l,i)))  
-			end forall
-			int1 = sum(fy)
-			
-			fy = 0.0_k_p
-			forall (i=0:knots_y)
-				y(i) = log(xin/x_middle)*dble(i)/dble(knots_y)
-			end forall
-			do i=1, knots_y
-				call knots_and_weights(knots_l, y(i-1), y(i), tt(:,i), w(:,i))
-			end do
-			forall (i = 1:knots_y)
-				fy(i) = sum(w(1:knots_l,i)*x_middle*exp(tt(1:knots_l,i))*calc_u(a,x_middle*exp(tt(1:knots_l,i))))  
-			end forall
-			!call knots_and_weights(knots_l, x_middle, x(knot_brdr), xx(1:knots_l,1), w(1:knots_l,1))!xin
-			int2 = sum(fy)!sum(w(1:knots_l,1)*calc_u(a,xx(1:knots_l,1))**2)    
-   
-			int1 = int1 + int2
-		end if
-		
-	end if
+! 			!call knots_and_weights(knots_l, x_middle, x(knot_brdr), xx(1:knots_l,1), w(1:knots_l,1))!xin
+! 			int2 = sum(fy)!sum(w(1:knots_l,1)*calc_u(a,xx(1:knots_l,1))**2)    
+!    
+! 			int1 = int1 + int2
+! 		end if
+! 		
+! 	end if
 	
 	int_u = max(0.5_k_p - int1, 0.0_k_p) ! = \int^{\inf}_{0} - \int^{x}_{0} ! FIXME
 
@@ -271,73 +294,95 @@ real(k_p), dimension(0:knots_y) :: y, fy
 integer :: knot_brdr, i
 
 	int_ux0 = uasqrt20/sqrt(8.0_k_p) ! exact value of integral, if x = 0 -- formula (26), page 10.
+	
 	int1 = 0.0_k_p
+	int2 = 0.0_k_p
 	fy = 0.0_k_p
-	if (xin .le. x_middle) then
-		
-		forall (i=0:knots_y)
-			y(i) = (xin)*dble(i)/dble(knots_y)
-		end forall
-		do i=1, knots_y
-			call knots_and_weights(knots_l, y(i-1), y(i), xx(:,i), w(:,i))
-		end do
-		forall (i = 1:knots_y)
-			fy(i) = sum(w(1:knots_l,i)*calc_u(a,xx(1:knots_l,i))**2)  
-		end forall
-		int1 = sum(fy)
-
-	else !(xin .gt. x_middle)
-		
-		if (a .lt. 1.0_k_p) then
-			if (xin .ge. 1000.0_k_p*x_middle) then !x(knot_x_last)
-				fy = 0.0_k_p
-				forall (i=0:knots_y)
-					y(i) = (log(x(knots)/x_middle) - log(xin/x_middle))*dble(i)/dble(knots_y)
-				end forall
-				do i=1, knots_y
-					call knots_and_weights(knots_l, y(i-1), y(i), tt(:,i), w(:,i))
-				end do
-				forall (i = 1:knots_y)
-					fy(i) = x_middle*sum(w(1:knots_l,i)*exp(tt(1:knots_l,i))*calc_u(a,x_middle*exp(tt(1:knots_l,i)))**2)  
-				end forall
-				int2 = sum(fy) ! посчитано то, что и нужно
-				int1 = int_ux0 - int2 !
-			else
-				knot_brdr = knot_x_last
-				do while ((x(knot_brdr) .lt. xin) .and. (knot_brdr .lt. knots))
-					knot_brdr = knot_brdr + 1
-				end do
-				int1 = simpson_int_knots_fx(knot_brdr, knot_x_last, x(0:knot_brdr), x_middle, (uax(0:knot_brdr)**2))
-			end if
- 		else
-			forall (i=0:knots_y)
-				y(i) = x_middle*dble(i)/dble(knots_y)
-			end forall
-			do i=1, knots_y
-				call knots_and_weights(knots_l, y(i-1), y(i), xx(:,i), w(:,i))
-			end do
-			forall (i = 1:knots_y)
-				fy(i) = sum(w(1:knots_l,i)*calc_u(a,xx(1:knots_l,i))**2)  
-			end forall
-			int1 = sum(fy)
-			
-			fy = 0.0_k_p
-			forall (i=0:knots_y)
-				y(i) = log(xin/x_middle)*dble(i)/dble(knots_y)
-			end forall
-			do i=1, knots_y
-				call knots_and_weights(knots_l, y(i-1), y(i), tt(:,i), w(:,i))
-			end do
-			forall (i = 1:knots_y)
-				fy(i) = sum(w(1:knots_l,i)*x_middle*exp(tt(1:knots_l,i))*calc_u(a,x_middle*exp(tt(1:knots_l,i)))**2)  
-			end forall
-			!call knots_and_weights(knots_l, x_middle, x(knot_brdr), xx(1:knots_l,1), w(1:knots_l,1))!xin
-			int2 = sum(fy)!sum(w(1:knots_l,1)*calc_u(a,xx(1:knots_l,1))**2)    
-   
-			int1 = int1 + int2
+	
+	knot_brdr = 0
+	!knot_brdr = knot_x_last
+	do while ((x(knot_brdr) .lt. xin) .and. (knot_brdr .lt. knots))
+		knot_brdr = knot_brdr + 1
+	end do
+	int1 = table_int(knot_brdr, knots, x(0:knots), uax(0:knots)**2)
+	
+	if (x(knot_brdr) .gt. xin) then
+		if (x(knot_brdr) .le. x_middle) then
+			call knots_and_weights(knots_l, x(knot_brdr), xin, xx(:,1), w(:,1))
+			int2 = sum(w(1:knots_l,1)*calc_u(a,xx(1:knots_l,1))**2)  
+		else
+			call knots_and_weights(knots_l, log10(x(knot_brdr)/x_middle), log10(xin/x_middle), xx(:,1), w(:,1))
+			int2 = sum(w(1:knots_l,1)*x_middle*exp(xx(1:knots_l,1))*calc_u(a, xx(1:knots_l,1))**2)  
 		end if
-		
 	end if
+	int1 = int1 - int2
+
+! 	if (xin .le. x_middle) then
+! 		
+! 		forall (i=0:knots_y)
+! 			y(i) = (xin)*dble(i)/dble(knots_y)
+! 		end forall
+! 		do i=1, knots_y
+! 			call knots_and_weights(knots_l, y(i-1), y(i), xx(:,i), w(:,i))
+! 		end do
+! 		forall (i = 1:knots_y)
+! 			fy(i) = sum(w(1:knots_l,i)*calc_u(a,xx(1:knots_l,i))**2)  
+! 		end forall
+! 		int1 = sum(fy)
+! 
+! 	else !(xin .gt. x_middle)
+! 		
+! 		if (a .lt. 1.0_k_p) then
+! 			if (xin .ge. 10.0_k_p*x_middle) then !x(knot_x_last)
+! 				fy = 0.0_k_p
+! 				forall (i=0:knots_y)
+! 					y(i) = (log(x(knots)/x_middle) - log(xin/x_middle))*dble(i)/dble(knots_y)
+! 				end forall
+! 				do i=1, knots_y
+! 					call knots_and_weights(knots_l, y(i-1), y(i), tt(:,i), w(:,i))
+! 				end do
+! 				forall (i = 1:knots_y)
+! 					fy(i) = x_middle*sum(w(1:knots_l,i)*exp(tt(1:knots_l,i))*calc_u(a,x_middle*exp(tt(1:knots_l,i)))**2)  
+! 				end forall
+! 				int2 = sum(fy) ! посчитано то, что и нужно
+! 				int1 = int_ux0 - int2 !
+! 			else
+! 				knot_brdr = knot_x_last
+! 				do while ((x(knot_brdr) .lt. xin) .and. (knot_brdr .lt. knots))
+! 					knot_brdr = knot_brdr + 1
+! 				end do
+! 				!int1 = simpson_int_knots_fx(knot_brdr, knot_x_last, x(0:knot_brdr), (uax(0:knot_brdr)**2))
+! 				int1 = table_int(knot_brdr, knots, x(0:knots), (uax(0:knots)**2))
+! 			end if
+!  		else
+! 			forall (i=0:knots_y)
+! 				y(i) = x_middle*dble(i)/dble(knots_y)
+! 			end forall
+! 			do i=1, knots_y
+! 				call knots_and_weights(knots_l, y(i-1), y(i), xx(:,i), w(:,i))
+! 			end do
+! 			forall (i = 1:knots_y)
+! 				fy(i) = sum(w(1:knots_l,i)*calc_u(a,xx(1:knots_l,i))**2)  
+! 			end forall
+! 			int1 = sum(fy)
+! 			
+! 			fy = 0.0_k_p
+! 			forall (i=0:knots_y)
+! 				y(i) = log(xin/x_middle)*dble(i)/dble(knots_y)
+! 			end forall
+! 			do i=1, knots_y
+! 				call knots_and_weights(knots_l, y(i-1), y(i), tt(:,i), w(:,i))
+! 			end do
+! 			forall (i = 1:knots_y)
+! 				fy(i) = sum(w(1:knots_l,i)*x_middle*exp(tt(1:knots_l,i))*calc_u(a,x_middle*exp(tt(1:knots_l,i)))**2)  
+! 			end forall
+! 			!call knots_and_weights(knots_l, x_middle, x(knot_brdr), xx(1:knots_l,1), w(1:knots_l,1))!xin
+! 			int2 = sum(fy)!sum(w(1:knots_l,1)*calc_u(a,xx(1:knots_l,1))**2)    
+!    
+! 			int1 = int1 + int2
+! 		end if
+! 		
+! 	end if
 	
 	int_u = max(int_ux0 - int1, 0.0_k_p) ! ! = \int^{\inf}_{0} - \int^{x}_{0} ! FIXME
 
@@ -394,7 +439,8 @@ real(k_p), dimension(0:knots) :: frac
 
 	if (b .ne. 0.0_k_p) then
 		frac(0:knots) = uax(0:knots)/(b*ua0 + uax(0:knots))
-		int1 = simpson_int_knots_fx( knots, knot_x_last, x(0:knots), x_middle, frac(0:knots) ) 
+		!int1 = simpson_int_knots_fx( knots, knot_x_last, x(0:knots), frac(0:knots) ) 
+		int1 = table_int( knots, knots, x(0:knots), frac(0:knots) ) 
 		buf = sqrt(a/(pi*b*ua0))
 		dd = int1 + buf*atan(buf)/x(knots)
 		d = 2.0_k_p * b * ua0 * dd	
@@ -456,7 +502,8 @@ integer :: i, knot_brdr
 		arctg(knot_brdr:knots) = atan2(v*(b*ua0 + uax(knot_brdr:knots)), ua0)	
 !write(*,*)' (85). 2'
 		frac(0:knots) = arctg(0:knots)*(uax(0:knots))**2	
-		int1 = simpson_int_knots_fx( knots, knot_x_last, x(0:knots), x_middle, frac(0:knots) ) 
+		!int1 = simpson_int_knots_fx( knots, knot_x_last, x(0:knots), frac(0:knots) ) 
+		int1 = table_int( knots, knots, x(0:knots), frac(0:knots) ) 
 		vv = (buf - 2.0_k_p*int1 )*v/ua0
 		dv = (1.0_k_p - delta_b - vv)!/(v*ua0)
 		vv_mod = dv/sqrt(api29*ua0*u) ! в этом случае оно совсем не нужно
@@ -489,7 +536,8 @@ integer :: i, knot_brdr
 		brackets(knot_brdr:knots) = (1.0_k_p - atan(y(knot_brdr:knots))/y(knot_brdr:knots))*y(knot_brdr:knots)
 		!y(knot_brdr:knots) - atan( y(knot_brdr:knots) )
 		frac(0:knots) = brackets(0:knots) * (uax(0:knots)/ua0)**2 
-		int1 = simpson_int_knots_fx( knots, knot_x_last, x(0:knots), x_middle, frac(0:knots) ) 	
+		!int1 = simpson_int_knots_fx( knots, knot_x_last, x(0:knots), frac(0:knots) ) 	
+		int1 = table_int( knots, knots, x(0:knots), frac(0:knots) ) 	
 		
 		dv = 2.0_k_p * int1 * ua0/u ! по тетрадке, а не по формуле. Отличие -- в расположении дроби.
 		vv = 1.0_k_p - delta_b - dv!*ua0/u		
@@ -582,7 +630,8 @@ else
 !write(*,*) 'calc lnH 5.1'
 			func2(0:knots) = -log1lvxb(0:knots)*dudx(0:knots)/(ua0**2 + (z*uax(0:knots))**2 )
 !write(*,*) 'calc lnH 5.2'
-			int2 = simpson_int_knots_fx( knots, knot_x_last, x(0:knots), x_middle, func2(0:knots) ) 
+			!int2 = simpson_int_knots_fx( knots, knot_x_last, x(0:knots), func2(0:knots) ) 
+			int2 = table_int( knots, knots, x(0:knots), func2(0:knots) ) 
 !write(*,*) 'calc lnH 6'			
 			lnH = s1 - (int1 + ua0*int2)*z/pi
 !		end if
@@ -632,7 +681,8 @@ else
 			!func2(0:knots) = ( log1lvxb(0:knots) - log(sqrt(api29*uax(0:knots)) ) )& 
 			!								* ( -dudx(0:knots)/((z*uax(0:knots))**2 + (ua0)**2) )  ! *uax(0:knots)/uax
 !write(*,*) 'calc lnH 4'
-			int2 = 	simpson_int_knots_fx( knots, knot_x_last, x(0:knots), x_middle, func2(0:knots) ) 			
+			!int2 = 	simpson_int_knots_fx( knots, knot_x_last, x(0:knots), func2(0:knots) ) 			
+			int2 = 	table_int( knots, knots, x(0:knots), func2(0:knots) ) 
 
 !write(*,*) 'calc series. z=', z,' int2=',int2
 			! calculating the series in formula (90)
@@ -693,7 +743,8 @@ else
 			!log1lvxb(0:knot_brdr) = log(1.0_k_p + l*(1.0_k_p - delta_b - vxb(0:knot_brdr))/(1.0_k_p - l + l*delta_b))
 			log1lvxb(0:knot_brdr) = log(1.0_k_p + l*dv(0:knot_brdr)/(1.0_k_p - l + l*delta_b)) !!!! uax(0:knot_brdr)*
 			func2(0:knots) = log1lvxb(0:knots) * ( -dudx(0:knots)/((uax(0:knots))**2 + (ua0/z)**2) )  ! *uax(0:knots)/uax
-			int2 = 	simpson_int_knots_fx( knots, knot_x_last, x(0:knots), x_middle, func2(0:knots) ) 
+			!int2 = simpson_int_knots_fx( knots, knot_x_last, x(0:knots), func2(0:knots) ) 
+			int2 = table_int( knots, knots, x(0:knots), func2(0:knots) ) 
 
 			lnH = s1 - (int1 + ua0*int2)/(z*pi) !/(pi*z)
 		end if
@@ -753,7 +804,8 @@ integer :: i
 	
 	func3(0:knots) = hfunc3(0:knots)/((uax(0:knots) + b*ua0 + m*ua0)**k)
 	func3(0:knots) = func3(0:knots)*(-dudx(0:knots)*int4(0:knots))/((uax(0:knots) + b*ua0)**n)
-	int3 = simpson_int_knots_fx(knots, knot_x_last, x(0:knots), x_middle, func3(0:knots))
+	!int3 = simpson_int_knots_fx(knots, knot_x_last, x(0:knots), func3(0:knots))
+	int3 = table_int(knots, knots, x(0:knots), func3(0:knots))
 	
 	NN = 2.0_k_p*int1*int2 + 2.0_k_p*int3*(ua0**(k+n-l-1))
 
@@ -853,7 +905,8 @@ integer :: i
 !write(*,*)'4',sum2(0),'!'!,sum2(4:10)!,intu1(0:knots)
 	func2(0:knots) = -dudx(0:knots)*intu1(0:knots)/(uax(0:knots) + b*ua0) *sum2(0:knots)
 !write(*,*)'5'!, func2(0:knots)
-	int2 = simpson_int_knots_fx(knots, knot_x_last, x(0:knots), x_middle, func2(0:knots))
+	!int2 = simpson_int_knots_fx(knots, knot_x_last, x(0:knots), func2(0:knots))
+	int2 = table_int(knots, knots, x(0:knots), func2(0:knots))
 !write(*,*)'q=',q,' int1=',int1,' int2=',int2	
 
 	MM = int1 + 2.0_k_p*ua0*int2
@@ -928,18 +981,47 @@ end function calc_M
 
 !end function calc_Mstarinf
 
+!*************************************
+!Calculating function I(q, l, b, a) --- formula ?? of paper.
+! a -- distribution parameter of sources (S = e^{-q\tau})
+! l -- lambda
+! b -- beta
+! a -- Voight parameter 
+!*************************************
+function calc_own_intensity_continuum(q, l, b, a) result(II)
+
+implicit none
+integer, parameter :: knots_i = 7
+real(k_p), intent(in) :: q, l, b, a
+real(k_p), dimension(0:nmu, 0:knots_all) :: II
+integer :: i, j
+real(k_p):: mfuncq
+
+	mfuncq = calc_M(1.0_k_p/q, l, b, a) 
+	
+	forall (i = 0:knots, j = 0:nmu) ! integrating on x0
+		II(j, i) = 1.0_k_p/((p(j,i) + q)*mu(j)) + &
+					0.5_k_p*l*alpha(i)*hfunc(j, i)/mu(j) * ( m0func(j,i) + mfuncq ) / ( p(j,i) + q) 
+	end forall
+	
+	return
+
+end function calc_own_intensity_continuum
+
+
 
 !*************************************
 !Calculating function I(eta1, eta2, XX, l, b) --- formula ?? of paper.
-! [eta1,eta2] -- range of angles
+! [acos(eta2), acos(eta1)] -- range of angles
 ! XX -- the edge frequency of F
 ! l -- lambda
 ! b - beta
 !*************************************
-pure function calc_reflected_intensity_line(eta1, eta2, XX, l, b) result(II)
+!pure 
+function calc_reflected_intensity_line_full(eta1, eta2, XX, l, b) result(II)
 
 implicit none
-integer, parameter :: knots_i = 5
+integer, parameter :: knots_i = 7 ! при больших углах количество узлов критично влияет на результат
 real(k_p), intent(in) :: eta1, eta2, XX, l, b
 real(k_p), dimension(0:nmu, 0:knots_all) :: II
 integer :: knot_brdr
@@ -964,18 +1046,121 @@ real(k_p), dimension(0:nmu, 0:knots_all, 0:knots_all) :: intfunc
 	forall (k = 0:knot_brdr)
 		intfunc(:, :, k) = alpha(k)*(alpha(k) + b)*intfunc(:, :, k)
 	end forall
-	
+
 	! TODO: from x(knot_brdr) to x0
 	
 	forall (i = 0:knots, j = 0:nmu) !integrating on x0
+		!II(j,i) = 0.25_k_p*l*ua0*alpha(i)*hfunc(j, i)/mu(j) * &
+		!		  simpson_int_knots_fx(knot_brdr, knot_x_last, x(0:knot_brdr), intfunc(j,i, 0:knot_brdr))
 		II(j,i) = 0.25_k_p*l*ua0*alpha(i)*hfunc(j, i)/mu(j) * &
-				  simpson_int_knots_fx(knot_brdr, knot_x_last, x(0:knot_brdr), x_middle, intfunc(j,i, 0:knot_brdr))
+				  table_int(knot_brdr, knots, x(0:knots), intfunc(j,i, 0:knots))
 	end forall
 	
 	return
 
-end function calc_reflected_intensity_line
+end function calc_reflected_intensity_line_full
 
+!*************************************
+! Calculating function I(eta1, XX, l, b) --- formula ?? of paper.
+! integrating on frequencies only!
+! [acos(eta2), acos(eta1)] -- range of angles
+! XX -- the edge frequency of F
+! l -- lambda
+! b - beta
+!*************************************
+!pure 
+function calc_reflected_intensity_line_angle(eta, XX, l, b) result(II)
+
+implicit none
+integer, parameter :: knots_i = 7 ! при больших углах количество узлов критично влияет на результат
+real(k_p), intent(in) :: eta, XX, l, b
+real(k_p), dimension(0:nmu, 0:knots_all) :: II
+integer :: knot_brdr
+integer :: i, j, k
+real(k_p), dimension(0:nmu, 0:knots_all, 0:knots_all) :: intensity
+real(k_p), dimension(0:knots_all) :: y0, H0
+
+	knot_brdr = 0
+	do while ((x(knot_brdr) .lt. XX) .and. (knot_brdr .le. knots))
+		knot_brdr = knot_brdr + 1
+	end do
+
+	y0 = 0.0_k_p
+	H0 = 0.0_k_p
+	forall (k = 0:knot_brdr)
+		y0(k) = ( alpha(k) + b)/eta
+	end forall
+	H0(0:knot_brdr) = exp(calc_lnH(1.0_k_p/y0(0:knot_brdr), l, b))
+		
+	intensity = 0.0_k_p
+	forall (i = 0:knots, j = 0:nmu, k = 0:knot_brdr)
+		intensity(j,i,k) =  H0(k)/(p(j,i) + y0(k))
+	end forall
+
+	! TODO: from x(knot_brdr) to x0
+	
+	forall (i = 0:knots, j = 0:nmu) !integrating on x0
+		II(j,i) = 0.25_k_p*l*ua0*alpha(i)*(hfunc(j, i)/mu(j)) *table_int(knot_brdr, knots, x(0:knots), intensity(j,i, 0:knots))
+	end forall
+	
+	return
+
+end function calc_reflected_intensity_line_angle
+
+
+!*************************************
+!Calculating function I(eta, XX, l, b) --- formula ?? of paper.
+! eta0 -- incidense angle
+! XX -- the edge frequency of Q
+! l -- lambda
+! b -- beta
+! a -- Voight parameter 
+!*************************************
+function calc_reflected_intensity_continuum(eta0, XX, l, b, a) result(II)
+
+implicit none
+integer, parameter :: knots_i = 7
+real(k_p), intent(in) :: eta0, XX, l, b, a
+real(k_p), dimension(0:nmu, 0:knots_all) :: II
+integer :: knot_brdr
+integer :: i, j, k
+real(k_p), dimension(0:knots_all) :: y0, mfuncy
+real(k_p), dimension(0:nmu, 0:knots_all, 0:knots_all) :: func1, func2
+
+	knot_brdr = 0
+	do while ((x(knot_brdr) .lt. XX) .and. (knot_brdr .le. knots))
+		knot_brdr = knot_brdr + 1
+	end do
+	
+	y0 = 0.0_k_p
+	y0(0:knot_brdr) = (alpha(0:knot_brdr) + b)/eta0
+	mfuncy(0:knot_brdr) =  calc_M(1.0_k_p/y0(0:knot_brdr), l, b, a) 
+	
+	func1 = 0.0_k_p
+	func2 = 0.0_k_p
+	forall (j = 0:nmu, i = 0:knots, k = 0:knot_brdr)
+		!func1(j,i,k) = 1.0_k_p/(p(j,i) + y0(k)) ! собственное излучение. ДИН сказал, что при отражении этого члена нет
+		func2(j,i,k) = ( m0func(j,i) + mfuncy(k) ) / ( p(j,i) + y0(k) )  
+	end forall
+	
+	! TODO: from x(knot_brdr) to XX
+	
+	forall (i = 0:knots, j = 0:nmu) ! integrating on x0
+! 		II(j, i) = &
+! 		0.25_k_p*l*ua0/mu(j) * ( &
+! 		simpson_int_knots_fx(knot_brdr, knot_x_last, x(0:knot_brdr), func1(j, i, 0:knot_brdr)) + &
+! 		0.125_k_p*(l**2)*ua0*alpha(i)*hfunc(j, i) * &
+! 		simpson_int_knots_fx(knot_brdr, knot_x_last, x(0:knot_brdr), func2(j, i, 0:knot_brdr))   &
+! 		)
+		II(j, i) = &
+		0.125_k_p*(l**2)*ua0*alpha(i)*hfunc(j, i)/mu(j) * &
+		simpson_int_knots_fx(knot_brdr, knot_x_last, x(0:knot_brdr), func2(j, i, 0:knot_brdr)) 
+		!table_int(knot_brdr, knots, x(0:knots), func2(j, i, 0:knots))  
+	end forall
+	
+	return
+
+end function calc_reflected_intensity_continuum
 
 
 !*************************************
@@ -986,10 +1171,10 @@ end function calc_reflected_intensity_line
 ! b -- beta
 ! a -- Voight parameter 
 !*************************************
-function calc_reflected_intensity_continuum(eta1, eta2, XX, l, b, a) result(II)
+function calc_reflected_intensity_continuum_full(eta1, eta2, XX, l, b, a) result(II)
 
 implicit none
-integer, parameter :: knots_i = 5
+integer, parameter :: knots_i = 7
 real(k_p), intent(in) :: eta1, eta2, XX, l, b, a
 real(k_p), dimension(0:nmu, 0:knots_all) :: II
 integer :: knot_brdr
@@ -1019,37 +1204,43 @@ real(k_p), dimension(0:nmu, 0:knots_all, 0:knots_all) :: func, func1, func2, int
 		end forall
 	end do !k
 	
-	func = 0.0_k_p
-	forall (k = 0:knot_brdr)
-		func(:, :, k) = 0.5_k_p*(1.0_k_p/y2(k)**2 - 1.0_k_p/y1(k)**2)
-	end forall
-	forall (k = 0:knot_brdr, i = 0:knots, j = 0:nmu, p(j,i) .ne. 0.0_k_p)
-		func(j, i, k) = ( p(j, i)*(y1(k) - y2(k)) - y1(k)*y2(k)* &
-						log( ( y1(k)*( p(j, i) + y2(k) ) )/( y2(k)*( p(j, i) + y1(k) ) ) ) )/&
-						( y1(k)*y2(k)*p(j, i)**2 )  
-	end forall
+! 	func = 0.0_k_p
+! 	forall (k = 0:knot_brdr)
+! 		func(:, :, k) = 0.5_k_p*(1.0_k_p/y2(k)**2 - 1.0_k_p/y1(k)**2)
+! 	end forall
+! 	forall (k = 0:knot_brdr, i = 0:knots, j = 0:nmu, p(j,i) .ne. 0.0_k_p)
+! 		func(j, i, k) = ( p(j, i)*(y1(k) - y2(k)) - y1(k)*y2(k)* &
+! 						log( ( y1(k)*( p(j, i) + y2(k) ) )/( y2(k)*( p(j, i) + y1(k) ) ) ) )/&
+! 						( y1(k)*y2(k)*p(j, i)**2 )  
+! 	end forall
 	
 	func1 = 0.0_k_p
 	func2 = 0.0_k_p
 	forall (k = 0:knot_brdr)
-		func1(:,:,k) = alpha(k)*(alpha(k) + b)*func(:,:,k)
-		func2(:,:,k) = alpha(k)*(alpha(k) + b)*intfunc(:,:,k)
+		!func1(:,:,k) = alpha(k)*(alpha(k) + b)*func(:,:,k)
+		func2(:,:,k) = intfunc(:,:,k) !alpha(k)*(alpha(k) + b)*
 	end forall
 	
 	! TODO: from x(knot_brdr) to x0
 	
 	forall (i = 0:knots, j = 0:nmu) ! integrating on x0
+! 		II(j, i) = &
+! 		0.25_k_p*l*ua0/mu(j) * ( &
+! 		simpson_int_knots_fx(knot_brdr, knot_x_last, x(0:knot_brdr), func1(j, i, 0:knot_brdr)) + &
+! 		0.125_k_p*(l**2)*ua0*alpha(i)*hfunc(j, i) * &
+! 		simpson_int_knots_fx(knot_brdr, knot_x_last, x(0:knot_brdr), func2(j, i, 0:knot_brdr))   &
+! 		)
 		II(j, i) = &
-		0.25_k_p*l*ua0/mu(j) * ( &
-		simpson_int_knots_fx(knot_brdr, knot_x_last, x(0:knot_brdr), x_middle, func1(j, i, 0:knot_brdr)) + &
-		0.125_k_p*(l**2)*ua0*alpha(i)*hfunc(j, i) * &
-		simpson_int_knots_fx(knot_brdr, knot_x_last, x(0:knot_brdr), x_middle, func2(j, i, 0:knot_brdr))   &
+		0.125_k_p*(l**2)*ua0/mu(j) * ( &
+		!table_int(knot_brdr, knots, x(0:knots), func1(j, i, 0:knots)) + &
+		alpha(i)*hfunc(j, i) * &
+		table_int(knot_brdr, knots, x(0:knots), func2(j, i, 0:knots))   &
 		)
 	end forall
 	
 	return
 
-end function calc_reflected_intensity_continuum
+end function calc_reflected_intensity_continuum_full
 
 !*************************************
 !*************************************

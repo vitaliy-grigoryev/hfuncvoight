@@ -6,8 +6,7 @@ implicit none
 integer, parameter, private :: max_dim = 28
 real(k_p), parameter, private :: acc = dble(1.0e-150) !?????
 
-real(k_p), dimension(1:max_dim, 1:max_dim), private :: roots, weights ! saved  Legendre`s roots and their weights
-!real(k_p), dimension(1:1000), private :: roots_s ! Simpson`s knots
+real(k_p), dimension(1:max_dim, 1:max_dim), private :: roots, weights, table_c ! saved  Legendre`s roots and their weights; weights of table indefinite integration
 
 contains
 
@@ -19,8 +18,12 @@ integer :: i
 	weights = 0.0_k_p
 	
 	do i = 1, max_dim
-		 call knots_and_weights_init(i, roots(i,1:max_dim), weights(i, 1:max_dim))
-		! write(*,*)"Knots and weights for degree ", i, " are computed"
+		 call knots_and_weights_init(i, roots(i,1:i), weights(i, 1:i))
+	end do
+	
+	table_c = 0.0_k_p
+	do i = 1, max_dim
+		 call table_weights_init(i, table_c(i, 1:i))
 	end do
 
 end subroutine initialization
@@ -45,31 +48,15 @@ real(k_p), dimension(1:n) :: k
 real(k_p), dimension(1:n, 1:n) :: t ! SIGMA(A[i]*t[i]^k)=2/(k+1) or 0
 
 	!maybe some optimization: save and read files with roots and weights?
-	!if (roots(n,1) .eq. 0.0_k_p) then
-		l = legendre(n)
+	l = legendre(n)
 	
-		t(1:n, 1) = 1.0_k_p
-		k(1) = 2.0_k_p
-		do i = 2, n
-			t(1:n, i) = t(1:n, i-1)*l(1:n)
-			k(i) = dble(mod(i, 2))*2.0_k_p/dble(i)
-		enddo
-!write(*,*)'Matrix T - degreeses of legendre`s roots:'
-!write(*,ft)t
-!write(*,*)'vector k - result vercor in sytem At=k'
-!write(*,ft)k
-		aa = CHOOSE(t, k, n)
-	!roots(n, 1:n) = l
-	!weights(n, 1:n) = aa
-	!else
-	!	l = roots(n, 1:n)
-	!	aa = weights(n, 1:n)
-	!end if
-	
-	!l(1:n) = a + (1.0_k_p + l(1:n))*(b-a)/2.0_k_p ! scaling roots to [a,b]
-	!aa = aa * (b-a)/2.0_k_p ! scale weights
-!write(*,'("roots  :",<n>f7.4)') l(1:n)
-!write(*,'("weights:",<n>f7.4)') aa(1:n)
+	t(1:n, 1) = 1.0_k_p
+	k(1) = 2.0_k_p
+	do i = 2, n
+		t(1:n, i) = t(1:n, i-1)*l(1:n)
+		k(i) = dble(mod(i, 2))*2.0_k_p/dble(i)
+	enddo
+	aa = CHOOSE(t, k, n)
 	
 end subroutine knots_and_weights_init
 
@@ -90,6 +77,41 @@ end subroutine knots_and_weights
 
 
 !*************************************
+! Returns values of C_m weights for table indefinite integrating (init - for initialization, normal - for computation)
+! n - length of c
+! c - vector of weights
+! 
+! For true integrating find the sum of multipliers:  
+!    do i = 1, n {ii=ii+cs(i)*f(x(i))} end do  ....or.... sum(c(1:n)*f(x(1:n)))
+!*************************************	
+pure subroutine table_weights_init(n, c) 
+implicit none
+
+integer, intent(in) :: n
+integer :: i, j
+real(k_p), dimension(1:n), intent(out) :: c ! result vector
+real(k_p), dimension(1:n) :: b
+real(k_p), dimension(1:n, 1:n) :: a 
+
+	
+	a(1:n, 1) = 1.0_k_p ! first row
+	b(1) = 0.5_k_p
+	forall (i = 2:n)
+		b(i) = 1.0_k_p/dble(2.0_k_p*i - 1)
+	end forall
+	
+	forall (i = 2:n, j = 1:n)
+		a(j,i) = (j-1)**(2*(i-1)) + j**(2*(i-1))
+	end forall
+	
+	! Solve A*c = b
+	c = CHOOSE(a, b, n)
+	
+end subroutine table_weights_init
+
+
+
+!*************************************
 ! Returns integral f(x)dx on some segment, calculated by Simpson`s method
 ! n - count of parts of segments of [a, b]
 ! a, b - segment [a,b]
@@ -102,34 +124,152 @@ real(k_p), intent(in) :: a, b
 real(k_p), dimension(0:n), intent(in) :: f
 real(k_p) :: ii
 	
-	ii = (b - a)/dble(3*n)  
-	ii = ii*( f(0) + 2.0_k_p*sum(f(2:n-2:2)) + 4.0_k_p*sum(f(1:n-1:2)) + f(n) ) 
+	ii = 0.0_k_p
+	if (n .ne. 0) then
+		ii = (b - a)/dble(3*n)  
+		ii = ii*( f(0) + 2.0_k_p*sum(f(2:n-2:2)) + 4.0_k_p*sum(f(1:n-1:2)) + f(n) ) 
+	end if
 	
 end function simpson_int
 
 !*************************************
 ! Returns integral f(x)dx on some segment, calculated by Simpson`s method, but using values of argument in all knots
 ! n - count of parts of segments of [a, b]
+! m - position of x_middle
 ! x - vector of x in segment [a,b]
 ! f - vector of f(x)
 !*************************************
-pure function simpson_int_knots_fx(n, m, x, x_m, f) result(ii)
+pure function simpson_int_knots_fx(n, m, x, f) result(ii)
 implicit none
 integer, intent(in) :: n, m ! full count of elements in vector x, start of t
 real(k_p), dimension(0:n), intent(in) :: x, f
-real(k_p), intent(in) :: x_m ! x = x_m*exp(t)
+!real(k_p), intent(in) :: x_m ! x = x_m*exp(t)
 real(k_p) :: ii, int1, int2
 	
-	if (x(m) .ge. x_m) then
+	int1 = 0.0_k_p
+	int2 = 0.0_k_p
+	if (n .gt. m) then
 		int1 = simpson_int(m, x(0), x(m), f(0:m))
-		int2 = simpson_int(n-m, log(x(m)/x_m), log(x(n)/x_m), x(m:n)*f(m:n))
+		int2 = simpson_int(n-m, 0.0_k_p, log(x(n)/x(m)), x(m:n)*f(m:n))
 	else
 		int1 = simpson_int(n, x(0), x(n), f(0:n))
-		int2 = 0.0_k_p
 	end if
 	ii = int1 + int2
 	
 end function simpson_int_knots_fx
+
+!*************************************
+! Returns integral f(x)dx on some segment, calculated by table indefinite integrating method
+! n - length of vectors x and f
+! i - number of element in given vector x, where integration is needed, 0 < i <=n
+! x - vector of x
+! f - vector of f = f(x)
+! Calculation integral of \int^{x_i}_{x_{i-1}} f(x) dx
+!*************************************
+pure function table_knots_int(n, i, x, f) result(ii)
+implicit none
+integer, intent(in) :: n, i
+real(k_p), dimension(0:n-1), intent(in) :: x, f
+real(k_p) :: ii
+integer :: k
+real(k_p), dimension(0:n-1) :: c ! result vector
+real(k_p), dimension(0:n-1) :: b
+real(k_p), dimension(0:n-1, 0:n-1) :: a 
+
+	forall (k = 0:n-1)
+		b(k) = (x(i)**(k+1) - x(i-1)**(k+1))/dble(k+1)
+	end forall
+	
+	forall (k = 0:n-1)
+		a(0:n-1,k) = x(0:n-1)**k
+	end forall
+	
+	! Solve A*c = b
+	c = CHOOSE(a, b, n)
+	
+	ii = sum(c(:)*f(:))
+	
+end function table_knots_int
+
+!*************************************
+! Returns integral f(x)dx on some segment, calculated by table indefinite integrating method
+! n - number of knot to integrate: \int_0^x[n]
+! knots - legth of x and f
+! x - vector of x in segment [a,b]
+! f - vector of f(x)
+! Yes, this method could be optimized very well, but it is not nesessary
+!*************************************
+pure function table_int(n, knots, x, f) result(integral)
+implicit none
+integer, intent(in) :: n, knots
+real(k_p), dimension(0:knots), intent(in) :: x, f
+real(k_p) :: integral
+
+integer, parameter :: order = 18
+real(k_p), dimension(0:knots) :: ii
+integer :: i
+	
+	ii = 0.0_k_p
+	!if (n .gt. 0) then !.and. n .le. order
+		forall (i = 1:order/2)
+			ii(i) = table_knots_int(order+1, i, x(0:order), f(0:order))
+		end forall
+	!end if
+	if (n+order/2-1 .ge. knots-order/2) then
+		forall (i = order/2+1:knots-order/2-1)
+			ii(i) = table_knots_int(order+1, order/2, x(i-order/2:i+order/2), f(i-order/2:i+order/2))
+		end forall
+		forall (i = knots-order/2:knots)
+			ii(i) = table_knots_int(order+1, i, x(knots-order:knots), f(knots-order:knots))
+		end forall
+	else
+ 		forall (i = order/2+1:n+order/2+1)
+			ii(i) = table_knots_int(order+1, order/2, x(i-order/2:i+order/2), f(i-order/2:i+order/2))
+		end forall
+	end if
+
+	integral = sum(ii(0:n))
+	
+end function table_int
+
+!*************************************
+! Returns integral f(x)dx on some segment, calculated by table indefinite integrating method, but using values of argument in all knots
+! n - count of parts of segments of [a, b]
+! order - order of integrating
+! m - position of x_middle
+! x - vector of x (-order+1:order)
+! f - vector of f(x)
+!*************************************
+! pure function table_int_knots_fx(n, order, m,  x, f) result(ii)
+! implicit none
+! integer, intent(in) :: n, order, m ! full count of elements in vector x, order if integrating
+! real(k_p), dimension(-order+1:order), intent(in) :: x, f
+! !real(k_p), intent(in) :: x_m ! x = x_m*exp(t)
+! real(k_p) :: ii
+! 	
+! 	ii = 0.0_k_p
+! 	if (n .lt. order) then
+! 		! TODO: extrapolating <-
+! 		ii = 0.0_k_p
+! 	else
+! 		if (n .gt. m-order) then
+! 			if (n .le. m) then
+! 				! TODO: extrapolating ->
+! 				ii = 0.0_k_p!table_int(m, order, x(0:m), f(0:m)) 
+! 			else
+! 				if (n .lt. m+order) then
+! 				! TODO: extrapolating <-
+! 				ii = 0.0_k_p!table_int(n-m, order, log(x(m:n+order)/x(m)), x(m:n+order)*f(m:n+order))
+! 				else ! n >= m+order
+! 					ii = table_int(order, x(n-order+1:n+order)*f(n-order+1:n+order))
+! 				end if
+! 			end if
+! 		else
+! 			ii = table_int(order, f(m-order+1:n+order))
+! 		end if
+! 	end if
+! 	
+! end function table_int_knots_fx
 
 !*************************************
 ! Returns integral f(x)dx on some segment, calculated by trapezoid method
@@ -147,6 +287,7 @@ real(k_p) :: ii
 
 end function trapezoid_int
 
+
 !*************************************
 ! Finds max(abs(x0)), where x0 - root of polynomial with a - koefficients
 !*************************************
@@ -162,8 +303,6 @@ real(k_p) :: x1, buf
 		y = 1.0_k_p
 		x = 0.0_k_p
 		x1 = 1.0_k_p
-!write(*,*)'BERNOULLI'
-!write(*,*)a
 		do while (abs(x-x1) .gt. acc) 
 			y(1:n)=y(0:n-1)
 			x1=x
@@ -173,13 +312,8 @@ real(k_p) :: x1, buf
 			enddo
 			y(0)=-buf/a(0)
 			x=y(0)/y(1)
-!write(*,"(F25.23)") x			
-!write(*,*)'Y:'
-!write(*,'(5e15.5)') y
-!write(*,*)'    X                           X1'
-!write(*,*)x,' ',x1
 		enddo
-!write(*,*)'Square of root is ',x
+
 end function bernoulli
 
 
@@ -217,8 +351,6 @@ real(k_p), dimension(1:n) :: x
 	nn = n
 	a = aa
 	do i = 1, n
-!write(*,*)'Polynom a, deg=',n-i+1
-!write(*,'(100f25.16)'),a
 		x(i) = bernoulli(nn, a)
 		nn=nn-1
 		a(0:nn) = gorner(nn+1, a, x(i))              
@@ -247,13 +379,9 @@ real(k_p), dimension (1:n) :: l
 	nn = n
 	do j = 2, nn
 		p2 = p1*(2*j-1)/j
-!write(*,*) 'Legendre, iteration #===', j
-!write(*,'(10f7.2)') p2
 		p2(1:nn) = p2(1:nn) - p0(0:nn-1)*(j-1)/j
 		p0 = p1
 		p1 = p2
-!write(*,*) 'Legendre, iteration #', j
-!write(*,'(11f10.4)') p2
 	enddo
 				
 	l(1:n/2) = allroots(n/2,p2) ! now we have half of count of roots, but squared

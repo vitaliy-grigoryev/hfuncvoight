@@ -4,7 +4,7 @@ use Fundamental_data
 
 implicit none
 integer, parameter :: knots = 200!180!360!180 ! 1800 count for knots on x
-integer, parameter :: nmu = 5 ! knots on angles (mu = cos(angle))
+integer, parameter :: nmu = 3 ! knots on angles (mu = cos(angle))
 integer, parameter :: knots_all = knots + knots/100 ! real count for knots on x
 integer, parameter :: knot_x_last = knots/2 ! last knot of x. After this goes t
 integer, parameter :: v_cnt = 50 ! count for knots on u = 1/v (integrating from 0 to 1)
@@ -35,6 +35,10 @@ integer :: i
 	do i = 1, nfact
 		fact(i) = fact(i-1)*real(i)
 	end do
+	
+	forall (i = 0:nmu)
+		mu(i) = cos(0.5*pi*dble(i)/dble(nmu))
+	end forall
 
 	forall (i = 0:knot_x_last)
 		x(i) = x_middle*dble(i)/dble(knot_x_last)
@@ -54,10 +58,10 @@ integer :: i
 		v(i) = v_up*dble(i)/dble(v_cnt)
 	end forall
 	
-	uax = -1.0_k_p
-	dudx = -1.0_k_p
-	intu1 = -1.0_k_p
-	intu2 = -1.0_k_p
+	uax = 0.0_k_p
+	dudx = 0.0_k_p
+	intu1 = 0.0_k_p
+	intu2 = 0.0_k_p
 
 end subroutine initialization_global
 
